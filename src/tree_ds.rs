@@ -9,11 +9,10 @@ use rand::prelude::SliceRandom;
 use nalgebra::{Rotation3, Unit};
 use rand::{Rng, SeedableRng};
 use std::f32::consts::PI;
-use std::convert::{From, Into};
-use ncollide3d::shape::{Compound, ShapeHandle, Ball, Cylinder, Capsule};
-use std::option::Option::Some;
-use ncollide3d::transformation::ToTriMesh;
-use ncollide3d::procedural::TriMesh;
+use std::convert::{From};
+use ncollide3d::shape::{Compound, ShapeHandle, Capsule};
+
+
 use rand_pcg::Pcg64;
 
 

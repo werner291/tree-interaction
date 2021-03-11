@@ -1,6 +1,3 @@
-use ncollide3d::procedural::TriMesh;
-use ncollide3d::transformation::ToTriMesh;
-
 struct ConicalFrustrum<N> {
     half_height: N,
     radius_1: N,
