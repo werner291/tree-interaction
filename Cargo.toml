@@ -1,0 +1,21 @@
+[package]
+name = "tree-interaction"
+version = "0.1.0"
+authors = ["Werner Kroneman <werner@wernerkroneman.nl>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nalgebra = "0.25.3"
+ncollide3d = "0.28.0"
+slotmap = "1.0.2"
+rand = "0.8.3"
+rand_pcg = "0.3.0"
+kiss3d = "0.30.0"
+kdtree = "0.6.0"
+itertools = "0.10.0"
+
+[build-dependencies]
+bindgen = "0.53.1"
+

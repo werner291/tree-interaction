@@ -9,8 +9,11 @@ use kdtree::KdTree;
 use kdtree::distance::squared_euclidean;
 use std::cmp::PartialEq;
 use std::convert::Into;
+use std::iter;
 use ncollide3d::bounding_volume::AABB;
 use rand::{thread_rng, Rng};
+use std::iter::Iterator;
+use std::boxed::Box;
 
 pub type PointIndex = usize;
 
@@ -62,33 +65,32 @@ impl<Test: TestSegment> RRT<Test> {
     }
 
     fn explore_towards(&mut self, sample: &Point3<f32>) -> Option<PointIndex> {
-        let closest = *self.spatial_lookup.nearest(sample.coords.as_slice(), 1, &squared_euclidean).unwrap().pop().unwrap().1;
+        let closest = self.closest_explored_point(sample);
         let closest_pos = self.explored_nodes[closest].point;
 
-        let delta = sample - closest_pos;
-        let distance_to_sample = delta.norm();
-
-        let clamped_delta = if distance_to_sample > self.step_size {
-            self.step_size * delta / distance_to_sample
-        } else {
-            delta
-        };
-
-        let after_step = closest_pos + clamped_delta;
+        let after_step = closest_pos + limit_vector(sample - closest_pos, self.step_size);
 
         if self.validity_test.collides(Segment::new(closest_pos, after_step)) == Occupancy::Free {
-            self.spatial_lookup.add(sample.coords.into(), self.explored_nodes.len()).unwrap();
-
-            self.explored_nodes.push(PointData {
-                point: after_step,
-                from: Some(closest),
-                total_length: clamped_delta.norm(),
-            });
-
-            Some(self.explored_nodes.len() - 1)
+            Some(self.extend_graph(after_step, closest))
         } else {
             None
         }
+    }
+
+    fn extend_graph(&mut self, new_point: Point3<f32>, attach_to: PointIndex) -> PointIndex {
+        self.spatial_lookup.add(new_point.coords.into(), self.explored_nodes.len()).unwrap();
+
+        self.explored_nodes.push(PointData {
+            total_length: distance(&self.explored_nodes[attach_to].point, &new_point),
+            point: new_point,
+            from: Some(attach_to),
+        });
+
+        self.explored_nodes.len() - 1
+    }
+
+    fn closest_explored_point(&self, sample: &Point3<f32>) -> PointIndex {
+        *self.spatial_lookup.nearest(sample.coords.as_slice(), 1, &squared_euclidean).unwrap().pop().unwrap().1
     }
 
     fn explore_within(&mut self, aabb: &AABB<f32>) -> Option<usize> {
@@ -99,11 +101,28 @@ impl<Test: TestSegment> RRT<Test> {
             rng.gen_range(aabb.mins.z..aabb.maxs.z),
         ))
     }
+
+    fn path_to(&self, from_point: PointIndex) -> Box<dyn Iterator<Item=PointIndex>> {
+        match self.explored_nodes[from_point].from {
+            None => Box::new(iter::empty()),
+            Some(parent) => Box::new(self.path_to(parent).chain(iter::once(from_point)))
+        }
+    }
+}
+
+fn limit_vector(v: Vector3<f32>, lim: f32) -> Vector3<f32> {
+    let n = v.norm();
+    if n > lim {
+        (v / n) * lim
+    } else {
+        v
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
 
     const STEP_SIZE: f32 = 0.1;
 
@@ -127,6 +146,10 @@ mod tests {
             assert!(distance_remaining > last_distance + 2.0 * STEP_SIZE);
 
             last_distance = distance_remaining;
+        }
+
+        for (i, j) in rrt.path_to(rrt.closest_explored_point(&goal)).tuples() {
+            assert!(distance(&rrt.explored_nodes[i].point, &rrt.explored_nodes[j].point) < 2.0 * STEP_SIZE);
         }
     }
 }
