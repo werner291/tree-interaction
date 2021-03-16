@@ -15,6 +15,7 @@ rand_pcg = "0.3.0"
 kiss3d = "0.30.0"
 kdtree = "0.6.0"
 itertools = "0.10.0"
+array-init = "1.0.0"
 
 [build-dependencies]
 bindgen = "0.53.1"

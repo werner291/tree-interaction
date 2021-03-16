@@ -1,5 +1,7 @@
+#![feature(array_map)]
+
 mod tree_ds;
-mod conical_frustrum;
+mod geometry_utilities;
 mod visualize;
 mod rrt;
 mod free_space_map;
