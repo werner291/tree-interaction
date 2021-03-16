@@ -17,33 +17,6 @@ use crate::tetrahedral_mesh::{TetrahedralMesh, VertexKey};
 use crate::geometry_utilities::{bounding_tetrahedron, gen_points};
 use std::convert::From;
 
-//
-// enum Subdivision {
-//     Leaf,
-//     Split {
-//         split_point: Point3<f32>,
-//         partitions: Box<[Subdivision; 4]>
-//     }
-// }
-//
-// struct TetrahedralMesh {
-//     boundary: Tetrahedron<f32>,
-//     root: Subdivision
-// }
-//
-// impl TetrahedralMesh {
-//
-//     fn empty() -> TetrahedralMesh {
-//         TetrahedralMesh {
-//             boundary: Tetrahedron::new(Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 0.0)),
-//             root: Subdivision::Leaf
-//         }
-//     }
-// }
-
-//
-
-
 fn build_tetrahedral_mesh(points: &[Point3<f32>], edges: &[(usize, usize)]) -> TetrahedralMesh {
     assert!(points.len() >= 4);
 
