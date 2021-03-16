@@ -185,7 +185,7 @@ impl TetrahedralMesh {
 
         // Remove the cell reference from its' vertices.
         for vid in cell.points.iter() {
-            self.points[*vid].hulls.remove(&cell_id);
+            self.points[*vid].incident_cells.remove(&cell_id);
         }
 
         // Create a new vertex from the given point.
@@ -215,13 +215,13 @@ impl TetrahedralMesh {
 
             // Ensure that the vertices properly refer back to the new cells.
             for pt in self.cells[tet_id].points.iter() {
-                self.points[*pt].hulls.insert(tet_id);
+                self.points[*pt].incident_cells.insert(tet_id);
             }
 
             // If the original cell had a neighbour on this face, chance that neighbour's
             // reference to the new cell.
             if let Some(nb) = cell.neighbours[i] {
-                self.cells[nb.tet].neighbours[nb.face] = Some(FaceKey {
+                self.cells[nb.cell].neighbours[nb.face] = Some(FaceKey {
                     cell: tet_id,
                     face: 0, // Note the indexing earlier: the original triangle is face 0.
                 });
@@ -326,14 +326,14 @@ mod tests {
 
             // Assert that the cell's vertices refer back to it.
             for v_i in tet.points.iter() {
-                assert!(mesh.points[*v_i].hulls.contains(&tet_i));
+                assert!(mesh.points[*v_i].incident_cells.contains(&tet_i));
             }
 
             // Assert that the cell's neighbours, if any, refer back to the cell
             // with correct face indices.
             for (i, nb) in tet.neighbours.iter().enumerate() {
                 if let Some(nb) = nb {
-                    assert_eq!(mesh.cells[nb.tet].neighbours[nb.face], Some(FaceKey { cell: tet_i, face: i }));
+                    assert_eq!(mesh.cells[nb.cell].neighbours[nb.face], Some(FaceKey { cell: tet_i, face: i }));
                 }
             }
         }
@@ -341,7 +341,7 @@ mod tests {
         // Make sure that the vertices don't refer to any missing cells,
         // and that these cells refer back to the vertex.
         for (p_i, pt) in mesh.points.iter() {
-            for m_i in pt.hulls.iter() {
+            for m_i in pt.incident_cells.iter() {
                 assert!(mesh.cells[*m_i].points.contains(&p_i));
             }
         }
