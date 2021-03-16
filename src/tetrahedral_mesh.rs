@@ -1,20 +1,16 @@
-#[feature(array_map)]
-use std::prelude::v1::Vec;
-
-use kdtree::KdTree;
-use kiss3d::nalgebra::Point3;
-use ncollide3d::shape::{Tetrahedron, Triangle};
-use std::convert::From;
-use slotmap::{SlotMap, new_key_type};
-use std::option::Option;
-use std::option::Option::{None, Some};
 use crate::geometry_utilities::point_inside_tetrahedron;
-use std::collections::HashSet;
 use array_init::array_init;
 use itertools::Itertools;
-use nalgebra::{Vector3, Isometry3};
-use ncollide3d::query::{RayCast, Ray};
-use std::iter::IntoIterator;
+#[feature(array_map)]
+use kiss3d::nalgebra::Point3;
+use nalgebra::{Isometry3, Vector3};
+use ncollide3d::query::{Ray, RayCast};
+use ncollide3d::shape::{Tetrahedron, Triangle};
+use slotmap::{new_key_type, SlotMap};
+use std::collections::HashSet;
+use std::convert::From;
+use std::option::Option;
+use std::option::Option::{None, Some};
 
 /// A struct representing a Vertex in the tetrahedral mesh. It has a position,
 /// as well as a set of references to tetrahedral cells incident to the vertex.
@@ -29,13 +25,17 @@ struct Vertex {
 /// Note that the mesh itself has no explicit concept of a "triangle".
 #[derive(Debug, Clone)]
 struct IndexTriangle {
-    points: [VertexKey; 3]
+    points: [VertexKey; 3],
 }
 
 impl IndexTriangle {
     /// Check if the triangles have the same vertex references, independent of order.
     fn same_vertices(&self, other: &IndexTriangle) -> bool {
-        self.points.iter().sorted().zip_eq(other.points.iter().sorted()).all(|(a, b)| a == b)
+        self.points
+            .iter()
+            .sorted()
+            .zip_eq(other.points.iter().sorted())
+            .all(|(a, b)| a == b)
     }
 }
 
@@ -67,10 +67,18 @@ impl IndexTetrahedron {
     /// The indexing matches that of ncollide3d::shape::Tetrahedron::face(usize).
     fn faces(&self) -> [IndexTriangle; 4] {
         [
-            IndexTriangle { points: [self.points[0], self.points[1], self.points[2]] },
-            IndexTriangle { points: [self.points[0], self.points[1], self.points[3]] },
-            IndexTriangle { points: [self.points[0], self.points[2], self.points[3]] },
-            IndexTriangle { points: [self.points[1], self.points[2], self.points[3]] },
+            IndexTriangle {
+                points: [self.points[0], self.points[1], self.points[2]],
+            },
+            IndexTriangle {
+                points: [self.points[0], self.points[1], self.points[3]],
+            },
+            IndexTriangle {
+                points: [self.points[0], self.points[2], self.points[3]],
+            },
+            IndexTriangle {
+                points: [self.points[1], self.points[2], self.points[3]],
+            },
         ]
     }
 
@@ -82,7 +90,7 @@ impl IndexTetrahedron {
         assert!(self.points.contains(&v));
 
         self.faces()
-            .into_iter()
+            .iter()
             .cloned()
             // The face opposite is the triangle that does not contain the vertex.
             .find(|tri| !tri.points.contains(&v))
@@ -123,7 +131,6 @@ impl TetrahedralMesh {
     ///
     /// Operation takes expected O(1) (+ amortized allocations and hashmap insertions)
     pub fn add_free_tetrahedron(&mut self, tet: Tetrahedron<f32>) -> TetrahedronKey {
-
         // Unpack the vertices.
         let Tetrahedron { a, b, c, d } = tet;
 
@@ -153,7 +160,11 @@ impl TetrahedralMesh {
     ///
     /// Will take `O(n + m)` time, where `m` and `n` are the number of incident cells to each vertex.
     pub fn points_share_tetrahedron(&self, v1: VertexKey, v2: VertexKey) -> Option<TetrahedronKey> {
-        self.points[v1].incident_cells.intersection(&self.points[v2].incident_cells).cloned().next()
+        self.points[v1]
+            .incident_cells
+            .intersection(&self.points[v2].incident_cells)
+            .cloned()
+            .next()
     }
 
     /// Find a tetrahedral cell that spatially contains the given point in its' interior. This cell
@@ -178,10 +189,16 @@ impl TetrahedralMesh {
     /// Returns the index of the given vertex, as well as the indices of the new cells.
     ///
     /// Warning: it is not checked whether the given point lies inside the cell.
-    pub fn split_cell(&mut self, cell_id: TetrahedronKey, point: Point3<f32>) -> (VertexKey, [TetrahedronKey; 4]) {
-
+    pub fn split_cell(
+        &mut self,
+        cell_id: TetrahedronKey,
+        point: Point3<f32>,
+    ) -> (VertexKey, [TetrahedronKey; 4]) {
         // Delete the cell and retrieve the struct.
-        let cell = self.cells.remove(cell_id).expect("Tetrahedron key invalid.");
+        let cell = self
+            .cells
+            .remove(cell_id)
+            .expect("Tetrahedron key invalid.");
 
         // Remove the cell reference from its' vertices.
         for vid in cell.points.iter() {
@@ -244,7 +261,6 @@ impl TetrahedralMesh {
     ///
     /// Note this method does not require the TetrahedralMesh's invariants to be valid.
     fn fix_neighbours(&mut self, cells: &[TetrahedronKey]) {
-
         // I did say it was brute-force... Maybe there's a more elegant way?
         //
         // Really, these are just a few nested loops that
@@ -253,13 +269,11 @@ impl TetrahedralMesh {
         for ta in cells.iter() {
             for (i, tra) in self.cells[*ta].faces().iter().enumerate() {
                 for tb in cells.iter() {
-                    if ta != tb { // Avoid self-pairing.
+                    if ta != tb {
+                        // Avoid self-pairing.
                         for (j, trb) in self.cells[*tb].faces().iter().enumerate() {
                             if tra.same_vertices(trb) {
-                                self.cells[*ta].neighbours[i] = Some(FaceKey {
-                                    cell: *tb,
-                                    face: j,
-                                })
+                                self.cells[*ta].neighbours[i] = Some(FaceKey { cell: *tb, face: j })
                             }
                             // Could probably skip a few iterations here,
                             // but I'm too scared to call break; at this point.
@@ -284,7 +298,10 @@ impl TetrahedralMesh {
     /// Create a vertex in the mesh, an allocate the appropriate bookkeeping structures,
     /// then return the resulting index.
     fn create_vertex(&mut self, pt: Point3<f32>) -> VertexKey {
-        self.points.insert(Vertex { position: pt, incident_cells: HashSet::new() })
+        self.points.insert(Vertex {
+            position: pt,
+            incident_cells: HashSet::new(),
+        })
     }
 
     /// Starting at the given vertex, and moving along the provided direction,
@@ -293,37 +310,44 @@ impl TetrahedralMesh {
     /// FIXME: This method has no concept of moving along a face or an edge,
     ///        in which case it may return either of the adjacent cells or None.
     ///        Should be fine if vertices are in general position, but still...
-    pub fn walk_from_vertex(&self, vertex: VertexKey, direction: Vector3<f32>) -> Option<TetrahedronKey> {
-
+    pub fn walk_from_vertex(
+        &self,
+        vertex: VertexKey,
+        direction: Vector3<f32>,
+    ) -> Option<TetrahedronKey> {
         // Look up vertex position and create a ray.
         let vpos = self.points[vertex].position;
         let ray = Ray::new(vpos, direction);
 
         // Iterate over all adjacent faces and raycast against the far face,
         // returning the first hit.
-        self.points[vertex].incident_cells.iter().cloned().find(|tk| {
-            let tri: IndexTriangle = self.cells[*tk].far_side(vertex);
-            let tri = Triangle::new(self.points[tri.points[0]].position, self.points[tri.points[1]].position, self.points[tri.points[2]].position);
-            tri.intersects_ray(&Isometry3::identity(), &ray, f32::INFINITY)
-        })
+        self.points[vertex]
+            .incident_cells
+            .iter()
+            .cloned()
+            .find(|tk| {
+                let tri: IndexTriangle = self.cells[*tk].far_side(vertex);
+                let tri = Triangle::new(
+                    self.points[tri.points[0]].position,
+                    self.points[tri.points[1]].position,
+                    self.points[tri.points[2]].position,
+                );
+                tri.intersects_ray(&Isometry3::identity(), &ray, f32::INFINITY)
+            })
     }
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::thread_rng;
-    use std::collections::{HashSet, VecDeque};
-    use rand::prelude::IteratorRandom;
+    use std::collections::VecDeque;
 
     /// Check the TetrahedralMesh's structural invariants, panicking if one is violated.
     /// Actual spatial properties are not checked.
     fn assert_invariants(mesh: &TetrahedralMesh) {
-
         // Iterate over every cell.
         for (tet_i, tet) in mesh.cells.iter() {
-
             // Assert that the cell's vertices refer back to it.
             for v_i in tet.points.iter() {
                 assert!(mesh.points[*v_i].incident_cells.contains(&tet_i));
@@ -333,7 +357,13 @@ mod tests {
             // with correct face indices.
             for (i, nb) in tet.neighbours.iter().enumerate() {
                 if let Some(nb) = nb {
-                    assert_eq!(mesh.cells[nb.cell].neighbours[nb.face], Some(FaceKey { cell: tet_i, face: i }));
+                    assert_eq!(
+                        mesh.cells[nb.cell].neighbours[nb.face],
+                        Some(FaceKey {
+                            cell: tet_i,
+                            face: i,
+                        })
+                    );
                 }
             }
         }
@@ -351,24 +381,24 @@ mod tests {
     #[test]
     fn split_test() {
         let mut mesh = TetrahedralMesh::empty();
-        let mut rng = thread_rng();
+        let _rng = thread_rng();
 
         let mut tet_refs: VecDeque<TetrahedronKey> = VecDeque::new();
 
         // Start with a single tetrahedron. Vertices are all (0,0,0), positions shouldn't matter.
-        tet_refs.push_back(mesh.add_free_tetrahedron(
-            Tetrahedron::new(Point3::new(0.0, 0.0, 0.0),
-                             Point3::new(0.0, 0.0, 0.0),
-                             Point3::new(0.0, 0.0, 0.0),
-                             Point3::new(0.0, 0.0, 0.0)))
-        );
+        tet_refs.push_back(mesh.add_free_tetrahedron(Tetrahedron::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 0.0),
+        )));
 
         assert_invariants(&mesh);
 
-        for i in 0..100 {
+        for _i in 0..100 {
             let ti = tet_refs.pop_front().unwrap();
 
-            let (vk, [a, b, c, d]) = mesh.split_cell(ti, Point3::new(0.0, 0.0, 0.0));
+            let (_vk, [a, b, c, d]) = mesh.split_cell(ti, Point3::new(0.0, 0.0, 0.0));
 
             tet_refs.push_back(a);
             tet_refs.push_back(b);

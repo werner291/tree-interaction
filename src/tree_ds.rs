@@ -3,18 +3,16 @@ use std::marker::Copy;
 use std::option::Option;
 use std::prelude::v1::Vec;
 
-use nalgebra::{Point3, Vector3, Isometry3, distance};
-use slotmap::{new_key_type, SlotMap};
-use rand::prelude::SliceRandom;
+use nalgebra::{distance, Isometry3, Point3, Vector3};
 use nalgebra::{Rotation3, Unit};
+use ncollide3d::shape::{Capsule, Compound, ShapeHandle};
+use rand::prelude::SliceRandom;
 use rand::{Rng, SeedableRng};
+use slotmap::{new_key_type, SlotMap};
+use std::convert::From;
 use std::f32::consts::PI;
-use std::convert::{From};
-use ncollide3d::shape::{Compound, ShapeHandle, Capsule};
-
 
 use rand_pcg::Pcg64;
-
 
 //
 new_key_type! {
@@ -52,15 +50,18 @@ impl ConstantRadiusTreeModel {
         }
     }
 
-    pub(crate) fn transformed_capsules(&self) -> impl Iterator<Item=(Isometry3<f32>, Capsule<f32>)> + '_ {
+    pub(crate) fn transformed_capsules(
+        &self,
+    ) -> impl Iterator<Item=(Isometry3<f32>, Capsule<f32>)> + '_ {
         self.dfs().flat_map(move |(_, current)| {
             current.children.iter().cloned().map(move |c| {
                 let p1 = current.position;
                 let p2 = self.nodes[c].position;
 
                 (
-                    Isometry3::face_towards(&(p1 + (p2 - p1) * 0.5), &p2, &Vector3::z()) * Isometry3::rotation(Vector3::new(PI / 2.0, 0.0, 0.0)),
-                    Capsule::new(distance(&p1, &p2) / 2.0, self.radius)
+                    Isometry3::face_towards(&(p1 + (p2 - p1) * 0.5), &p2, &Vector3::z())
+                        * Isometry3::rotation(Vector3::new(PI / 2.0, 0.0, 0.0)),
+                    Capsule::new(distance(&p1, &p2) / 2.0, self.radius),
                 )
             })
         })
@@ -97,11 +98,17 @@ pub fn gen_tree(seed: u64) -> ConstantRadiusTreeModel {
     let mut node_sampling_pool = vec![root];
 
     for _ in 0..20 {
-        let parent = *node_sampling_pool.choose(&mut rng).expect("Should never be empty.");
+        let parent = *node_sampling_pool
+            .choose(&mut rng)
+            .expect("Should never be empty.");
 
-        let delta = Rotation3::from_axis_angle(&Unit::new_unchecked(Vector3::y()), rng.gen_range(0.0..(2.0 * PI))) *
-            Rotation3::from_axis_angle(&Unit::new_unchecked(Vector3::x()), rng.gen_range(0.0..1.0)) *
-            Vector3::new(0.0, 1.0, 0.0);
+        let delta = Rotation3::from_axis_angle(
+            &Unit::new_unchecked(Vector3::y()),
+            rng.gen_range(0.0..(2.0 * PI)),
+        ) * Rotation3::from_axis_angle(
+            &Unit::new_unchecked(Vector3::x()),
+            rng.gen_range(0.0..1.0),
+        ) * Vector3::new(0.0, 1.0, 0.0);
 
         dbg!(&delta);
 
@@ -125,7 +132,11 @@ pub fn gen_tree(seed: u64) -> ConstantRadiusTreeModel {
 
 impl From<&ConstantRadiusTreeModel> for Compound<f32> {
     fn from(tm: &ConstantRadiusTreeModel) -> Self {
-        Compound::new(tm.transformed_capsules().map(|(tf, caps)| (tf, ShapeHandle::new(caps))).collect())
+        Compound::new(
+            tm.transformed_capsules()
+                .map(|(tf, caps)| (tf, ShapeHandle::new(caps)))
+                .collect(),
+        )
     }
 }
 

@@ -25,7 +25,10 @@ pub fn elevation_azimuth_vector(elevation: f32, azimuth: f32) -> Vector3<f32> {
     )
 }
 
-pub fn bounding_tetrahedron<'a, I>(points: I) -> Tetrahedron<f32> where I: IntoIterator<Item=&'a Point3<f32>> {
+pub fn bounding_tetrahedron<'a, I>(points: I) -> Tetrahedron<f32>
+    where
+        I: IntoIterator<Item=&'a Point3<f32>>,
+{
     let plane_normals = [
         elevation_azimuth_vector(PI / 2.0, 0.0),
         elevation_azimuth_vector(-PI / 6.0, 0.0),
@@ -35,7 +38,12 @@ pub fn bounding_tetrahedron<'a, I>(points: I) -> Tetrahedron<f32> where I: IntoI
 
     let center = Point3::new(0.0, 0.0, 0.0);
 
-    let t = points.into_iter().map(|pt| distance(pt, &center)).max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap_or(0.0) * 5.0;
+    let t = points
+        .into_iter()
+        .map(|pt| distance(pt, &center))
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap_or(0.0)
+        * 5.0;
 
     Tetrahedron::new(
         center + t * plane_normals[0],
@@ -60,23 +68,27 @@ pub fn point_inside_tetrahedron(tet: &Tetrahedron<f32>, pt: &Point3<f32>) -> boo
     })
 }
 
-pub(crate) fn gen_points<R: Rng>(mut rng: &mut R) -> Vec<Point3<f32>> {
-    (0..100).map(|_| {
-        Point3::new(
-            rng.gen_range(-10.0..10.0),
-            rng.gen_range(-10.0..10.0),
-            rng.gen_range(-10.0..10.0),
-        )
-    }).collect()
+pub(crate) fn gen_points<R: Rng>(rng: &mut R) -> Vec<Point3<f32>> {
+    (0..100)
+        .map(|_| {
+            Point3::new(
+                rng.gen_range(-10.0..10.0),
+                rng.gen_range(-10.0..10.0),
+                rng.gen_range(-10.0..10.0),
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use std::convert::From;
 
-    use rand::{Rng, thread_rng};
+    use rand::{thread_rng, Rng};
 
-    use crate::geometry_utilities::{bounding_tetrahedron, elevation_azimuth_vector, point_inside_tetrahedron};
+    use crate::geometry_utilities::{
+        bounding_tetrahedron, elevation_azimuth_vector, point_inside_tetrahedron,
+    };
 
     use super::*;
 
@@ -96,21 +108,24 @@ mod tests {
 
     #[test]
     fn tet_contains_center() {
-        let tet = Tetrahedron::new(Point3::new(1.0, 0.0, 0.0),
-                                   Point3::new(-1.0, 0.0, 0.0),
-                                   Point3::new(0.0, 1.0, 0.0),
-                                   Point3::new(0.0, 0.0, 1.0));
-
-        let cog = Point3::from(
-            (tet.a.coords + tet.b.coords + tet.c.coords + tet.d.coords) / 4.0
+        let tet = Tetrahedron::new(
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(-1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
         );
+
+        let cog = Point3::from((tet.a.coords + tet.b.coords + tet.c.coords + tet.d.coords) / 4.0);
 
         assert!(point_inside_tetrahedron(&tet, &cog));
 
         let mut rng = thread_rng();
 
         for _ in 0..100 {
-            let v = elevation_azimuth_vector(rng.gen_range(-PI / 2.0..PI / 2.0), rng.gen_range(-PI..PI));
+            let v = elevation_azimuth_vector(
+                rng.gen_range(-PI / 2.0..PI / 2.0),
+                rng.gen_range(-PI..PI),
+            );
             dbg!(&v);
             assert!(!point_inside_tetrahedron(&tet, &Point3::from(v * 100.0)));
         }
