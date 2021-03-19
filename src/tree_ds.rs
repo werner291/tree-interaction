@@ -6,18 +6,22 @@ use std::prelude::v1::Vec;
 use nalgebra::{distance, Isometry3, Point3, Vector3};
 use nalgebra::{Rotation3, Unit};
 use ncollide3d::shape::{Capsule, Compound, ShapeHandle};
-use rand::prelude::SliceRandom;
+use rand::prelude::{SliceRandom, IteratorRandom};
 use rand::{Rng, SeedableRng};
 use slotmap::{new_key_type, SlotMap};
 use std::convert::From;
 use std::f32::consts::PI;
 
 use rand_pcg::Pcg64;
+use kiss3d::window::Window;
+use ncollide3d::transformation::ToTriMesh;
+
+type TreeNodeKey = usize;
 
 //
-new_key_type! {
-    pub struct TreeNodeKey;
-}
+// new_key_type! {
+//     pub struct TreeNodeKey;
+// }
 //
 // pub struct TreeNode<D> {
 //     data: D,
@@ -37,7 +41,7 @@ pub struct TreeNode {
 }
 
 pub struct ConstantRadiusTreeModel {
-    pub nodes: SlotMap<TreeNodeKey, TreeNode>,
+    pub nodes: Vec<TreeNode>,
     pub radius: f32,
     pub root: TreeNodeKey,
 }
@@ -88,17 +92,19 @@ impl<'a> Iterator for Dfs<'a> {
 pub fn gen_tree(seed: u64) -> ConstantRadiusTreeModel {
     let mut rng = Pcg64::seed_from_u64(seed);
 
-    let mut nodes: SlotMap<TreeNodeKey, TreeNode> = SlotMap::with_key();
+    // let mut nodes: SlotMap<TreeNodeKey, TreeNode> = SlotMap::with_key();
+    let mut nodes = Vec::new();
 
-    let root = nodes.insert(TreeNode {
+    let root = 0;
+    nodes.push(TreeNode {
         position: Point3::new(0.0, 0.0, 0.0),
         children: vec![],
     });
 
-    let mut node_sampling_pool = vec![root];
+    // let mut node_sampling_pool = vec![root];
 
     for _ in 0..20 {
-        let parent = *node_sampling_pool
+        let parent = (0..nodes.len())
             .choose(&mut rng)
             .expect("Should never be empty.");
 
@@ -110,17 +116,17 @@ pub fn gen_tree(seed: u64) -> ConstantRadiusTreeModel {
             rng.gen_range(0.0..1.0),
         ) * Vector3::new(0.0, 1.0, 0.0);
 
-        dbg!(&delta);
+        let child_pos = &nodes[parent].position + delta;
 
-        let child_pos = nodes[parent].position + delta;
-
-        let child_node = nodes.insert(TreeNode {
+        nodes.push(TreeNode {
             position: child_pos,
             children: vec![],
         });
 
-        nodes[parent].children.push(child_node);
-        node_sampling_pool.push(child_node);
+        let child_id = nodes.len() - 1;
+
+        nodes[parent].children.push(child_id);
+        // node_sampling_pool.push(child_node);
     }
 
     ConstantRadiusTreeModel {
@@ -137,6 +143,14 @@ impl From<&ConstantRadiusTreeModel> for Compound<f32> {
                 .map(|(tf, caps)| (tf, ShapeHandle::new(caps)))
                 .collect(),
         )
+    }
+}
+
+pub fn put_tree_in_scene(window: &mut Window, tree: &ConstantRadiusTreeModel) {
+    for (tf, child) in tree.transformed_capsules() {
+        let mut node =
+            window.add_trimesh(child.to_trimesh((5, 5)), Vector3::new(1.0, 1.0, 1.0));
+        node.set_local_transformation(tf);
     }
 }
 

@@ -6,6 +6,7 @@ mod rrt;
 mod tetrahedral_mesh;
 mod tree_ds;
 mod visualize;
+mod tetgen;
 
 // impl ToTriMesh<f32> for ConstantRadiusTreeModel {
 //     type DiscretizationParameter = usize;
@@ -17,7 +18,7 @@ mod visualize;
 
 #[cfg(test)]
 mod tests {
-    use crate::tree_ds::gen_tree;
+    use crate::tree_ds::{gen_tree, ConstantRadiusTreeModel, put_tree_in_scene};
     use kiss3d::window::Window;
     use ncollide3d::transformation::ToTriMesh;
 
@@ -29,11 +30,7 @@ mod tests {
 
         let tree = gen_tree(42);
 
-        for (tf, child) in tree.transformed_capsules() {
-            let mut node =
-                window.add_trimesh(child.to_trimesh((5, 5)), Vector3::new(1.0, 1.0, 1.0));
-            node.set_local_transformation(tf);
-        }
+        put_tree_in_scene(&mut window, &tree);
 
         // let as_compound : Compound<f32> = tree.into();
 
@@ -41,4 +38,6 @@ mod tests {
             // draw_tree_skeleton(&mut window, &tree)
         }
     }
+
+
 }
